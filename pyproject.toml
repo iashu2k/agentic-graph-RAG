@@ -5,5 +5,15 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12.13"
 dependencies = [
+    "fastapi>=0.139.2",
+    "groq>=1.5.0",
+    "pgvector>=0.5.0",
+    "psycopg2-binary>=2.9.12",
+    "pydantic-settings>=2.14.2",
+    "python-dotenv>=1.2.2",
     "sec-edgar-downloader>=5.1.0",
+    "sentence-transformers>=5.6.0",
+    "sqlalchemy>=2.0.51",
+    "unstructured[pdf]>=0.24.1",
+    "uvicorn>=0.51.0",
 ]
