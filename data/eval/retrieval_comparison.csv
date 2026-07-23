@@ -1,0 +1,11 @@
+query,vector_only_hit,hybrid_hit
+What was Apple revenue in Q2 2023?,True,True
+What was Amazon's net income in Q1 2023?,True,True
+What was Intel's operating expenses in Q3 2022?,True,True
+What was Microsoft's total revenue in Q3 2023?,True,True
+What was NVIDIA's gross margin in Q1 2023?,True,True
+What was Apple's cash and equivalents in Q3 2022?,True,True
+What was Amazon's operating income in Q3 2023?,True,True
+What was Intel's revenue in Q1 2023?,True,True
+What was Microsoft's net income in Q2 2023?,True,True
+What was NVIDIA's revenue in Q3 2023?,True,True

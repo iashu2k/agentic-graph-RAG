@@ -1,0 +1,366 @@
+
+
+########## BASIC QUERIES ##########
+
+================================================================================
+QUERY: What was Apple revenue in Q2 2023?
+Expected: Apple Q2 FY2023 | keyword='Revenue'
+
+-- Vector-only top 5 --
+  Apple Q3 FY2023 | Note 2 – Revenue
+  Apple Q2 FY2023 | Note 2 – Revenue
+  Apple Q3 FY2022 | Note 2 – Revenue
+  Apple Q3 FY2023 | Note 2 – Revenue
+  Apple Q3 FY2022 | Note 2 – Revenue
+
+-- Hybrid+rerank top 5 --
+  Apple Q2 FY2023 | Note 2 – Revenue | score=9.520
+  Apple Q3 FY2023 | Note 2 – Revenue | score=9.203
+  Apple Q1 FY2023 | Note 2 – Revenue | score=9.002
+  Apple Q3 FY2022 | Note 2 – Revenue | score=8.925
+  Apple Q2 FY2023 | Note 2 – Revenue | score=8.055
+
+================================================================================
+QUERY: What was Amazon's net income in Q1 2023?
+Expected: Amazon Q1 FY2023 | keyword='Operations|Net Sales|Income'
+
+-- Vector-only top 5 --
+  Amazon Q1 FY2023 | Guidance
+  Amazon Q1 FY2023 | AMAZON.COM, INC. CONSOLIDATED STATEMENTS OF OPERATIONS
+  Amazon Q1 FY2023 | Net Sales
+  Amazon Q3 FY2023 | AMAZON.COM, INC. CONSOLIDATED STATEMENTS OF OPERATIONS
+  Amazon Q3 FY2022 | AMAZON.COM, INC. CONSOLIDATED STATEMENTS OF OPERATIONS
+
+-- Hybrid+rerank top 5 --
+  Amazon Q1 FY2023 | Other Operating Expense (Income), Net | score=9.509
+  Amazon Q1 FY2023 | Net Sales | score=8.641
+  Amazon Q1 FY2023 | Other Income (Expense), Net | score=7.723
+  Amazon Q1 FY2023 | Net Sales | score=7.635
+  Amazon Q1 FY2023 | Other Income (Expense), Net | score=6.698
+
+================================================================================
+QUERY: What was Intel's operating expenses in Q3 2022?
+Expected: Intel Q3 FY2022 | keyword='Operating Expenses'
+
+-- Vector-only top 5 --
+  Intel Q3 FY2023 | Operating Expenses
+  Intel Q2 FY2023 | Operating Expenses
+  Intel Q1 FY2023 | Operating Expenses
+  Intel Q3 FY2022 | Operating Expenses
+  Intel Q3 FY2023 | Research and Development $B
+
+-- Hybrid+rerank top 5 --
+  Intel Q3 FY2023 | Operating Expenses | score=9.499
+  Intel Q1 FY2023 | Operating Expenses | score=9.391
+  Intel Q2 FY2023 | Operating Expenses | score=9.345
+  Intel Q3 FY2022 | Operating Expenses | score=8.574
+  Intel Q3 FY2023 | Operating Income (Loss) Summary | score=7.648
+
+================================================================================
+QUERY: What was Microsoft's total revenue in Q3 2023?
+Expected: Microsoft Q3 FY2023 | keyword='Revenue|Operations|In millions'
+
+-- Vector-only top 5 --
+  Microsoft Q3 FY2023 | (In millions)
+  Microsoft Q3 FY2022 | (In millions)
+  Microsoft Q3 FY2023 | (In millions)
+  Microsoft Q3 FY2023 | Three Months Ended September 30, 2023 Compared with Three Months Ended September 30, 2022
+  Microsoft Q3 FY2023 | Three Months Ended September 30, 2023 Compared with Three Months Ended September 30, 2022
+
+-- Hybrid+rerank top 5 --
+  Microsoft Q1 FY2023 | NOTE 12 — UNEARNED REVENUE | score=8.230
+  Microsoft Q3 FY2023 | (In millions) | score=7.925
+  Microsoft Q3 FY2023 | SUMMARY RESULTS OF OPERATIONS | score=7.828
+  Microsoft Q3 FY2022 | (In millions) | score=7.718
+  Microsoft Q3 FY2023 | Three Months Ended September 30, 2023 Compared with Three Months Ended September 30, 2022 | score=7.511
+
+================================================================================
+QUERY: What was NVIDIA's gross margin in Q1 2023?
+Expected: NVIDIA Q1 FY2023 | keyword='Gross Margin'
+
+-- Vector-only top 5 --
+  NVIDIA Q1 FY2023 | Gross Margin
+  NVIDIA Q3 FY2023 | Gross Margin
+  NVIDIA Q3 FY2022 | Gross Margin
+  NVIDIA Q3 FY2023 | Third Quarter of Fiscal Year 2024 Summary
+  NVIDIA Q1 FY2023 | Revenue
+
+-- Hybrid+rerank top 5 --
+  NVIDIA Q1 FY2023 | Gross Margin | score=8.510
+  NVIDIA Q3 FY2023 | Third Quarter of Fiscal Year 2024 Summary | score=8.445
+  NVIDIA Q3 FY2022 | Gross Margin | score=8.260
+  NVIDIA Q3 FY2022 | Gross Margin | score=8.184
+  NVIDIA Q3 FY2023 | Gross Margin | score=8.175
+
+================================================================================
+QUERY: What was Apple's cash and equivalents in Q3 2022?
+Expected: Apple Q3 FY2022 | keyword='Cash'
+
+-- Vector-only top 5 --
+  Apple Q3 FY2023 | Cash, Cash Equivalents and Marketable Securities
+  Apple Q3 FY2022 | CONDENSED CONSOLIDATED STATEMENTS OF CASH FLOWS (Unaudited)
+  Apple Q2 FY2023 | Cash, Cash Equivalents and Marketable Securities
+  Apple Q3 FY2022 | CONDENSED CONSOLIDATED STATEMENTS OF OPERATIONS (Unaudited)
+  Apple Q2 FY2023 | Note 3 – Financial Instruments
+
+-- Hybrid+rerank top 5 --
+  Apple Q3 FY2023 | CONDENSED CONSOLIDATED STATEMENTS OF CASH FLOWS (Unaudited) | score=8.284
+  Apple Q3 FY2022 | Cash, Cash Equivalents and Marketable Securities | score=8.005
+  Apple Q3 FY2022 | Cash, Cash Equivalents and Marketable Securities | score=7.860
+  Apple Q3 FY2023 | Cash, Cash Equivalents and Marketable Securities | score=7.837
+  Apple Q2 FY2023 | Cash, Cash Equivalents and Marketable Securities | score=7.800
+
+================================================================================
+QUERY: What was Amazon's operating income in Q3 2023?
+Expected: Amazon Q3 FY2023 | keyword='Operating Income|Operations'
+
+-- Vector-only top 5 --
+  Amazon Q3 FY2023 | Operating Income (Loss)
+  Amazon Q2 FY2023 | Operating Income (Loss)
+  Amazon Q3 FY2022 | Operating Income (Loss)
+  Amazon Q1 FY2023 | Net Sales
+  Amazon Q3 FY2022 | Operating Income (Loss)
+
+-- Hybrid+rerank top 5 --
+  Amazon Q3 FY2023 | Other Operating Expense (Income), Net | score=9.473
+  Amazon Q1 FY2023 | Net Sales | score=9.177
+  Amazon Q3 FY2022 | Operating Income (Loss) | score=8.909
+  Amazon Q3 FY2023 | Operating Income (Loss) | score=8.741
+  Amazon Q3 FY2023 | Operating Income (Loss) | score=8.707
+
+================================================================================
+QUERY: What was Intel's revenue in Q1 2023?
+Expected: Intel Q1 FY2023 | keyword='Revenue'
+
+-- Vector-only top 5 --
+  Intel Q1 FY2023 | Revenue Summary
+  Intel Q1 FY2023 | Consolidated Condensed Results of Operations
+  Intel Q1 FY2023 | Q1 2023 vs. Q1 2022
+  Intel Q1 FY2023 | Operating Expenses
+  Intel Q1 FY2023 | A Quarter in Review
+
+-- Hybrid+rerank top 5 --
+  Intel Q1 FY2023 | Q1 2023 vs. Q1 2022 | score=8.962
+  Intel Q1 FY2023 | Client Computing | score=8.557
+  Intel Q1 FY2023 | Operating Expenses | score=8.417
+  Intel Q1 FY2023 | Q1 2023 vs. Q1 2022 | score=8.195
+  Intel Q3 FY2023 | Q3 2023 vs. Q3 2022 | score=8.050
+
+================================================================================
+QUERY: What was Microsoft's net income in Q2 2023?
+Expected: Microsoft Q2 FY2023 | keyword='Income|Operations|In millions'
+
+-- Vector-only top 5 --
+  Microsoft Q3 FY2022 | (In millions)
+  Microsoft Q3 FY2022 | INCOME STATEMENTS
+  Microsoft Q3 FY2023 | SUMMARY RESULTS OF OPERATIONS
+  Microsoft Q2 FY2023 | INCOME STATEMENTS
+  Microsoft Q3 FY2022 | Income Taxes
+
+-- Hybrid+rerank top 5 --
+  Microsoft Q2 FY2023 | OTHER INCOME (EXPENSE), NET | score=8.336
+  Microsoft Q2 FY2023 | NOTE 3 — OTHER INCOME (EXPENSE), NET | score=8.293
+  Microsoft Q2 FY2023 | COMPREHENSIVE INCOME STATEMENTS | score=7.882
+  Microsoft Q2 FY2023 | Estimates and Assumptions | score=7.524
+  Microsoft Q3 FY2023 | SUMMARY RESULTS OF OPERATIONS | score=7.422
+
+================================================================================
+QUERY: What was NVIDIA's revenue in Q3 2023?
+Expected: NVIDIA Q3 FY2023 | keyword='Revenue'
+
+-- Vector-only top 5 --
+  NVIDIA Q3 FY2023 | Revenue
+  NVIDIA Q3 FY2022 | Revenue
+  NVIDIA Q1 FY2023 | Revenue
+  NVIDIA Q3 FY2023 | Third Quarter of Fiscal Year 2024 Summary
+  NVIDIA Q3 FY2023 | Market Platform Highlights
+
+-- Hybrid+rerank top 5 --
+  NVIDIA Q3 FY2023 | Revenue | score=10.150
+  NVIDIA Q2 FY2023 | Revenue | score=9.509
+  NVIDIA Q3 FY2023 | Market Platform Highlights | score=8.701
+  NVIDIA Q3 FY2023 | Deferred Revenue | score=8.495
+  NVIDIA Q3 FY2022 | Concentration of Revenue | score=8.215
+
+
+########## HARD QUERIES ##########
+
+================================================================================
+QUERY: What does Apple's commitments and contingencies note say in Q3 2022?
+Expected: Apple Q3 FY2022 | keyword='Commitments and Contingencies'
+
+-- Vector-only top 5 --
+  Apple Q2 FY2023 | Note 9 – Commitments and Contingencies
+  Apple Q3 FY2022 | Note 8 – Commitments and Contingencies
+  Apple Q3 FY2023 | Note 9 – Commitments and Contingencies
+  Apple Q1 FY2023 | Note 8 – Commitments and Contingencies
+  Apple Q2 FY2023 | Note 3 – Financial Instruments
+
+-- Hybrid+rerank top 5 --
+  Apple Q3 FY2022 | Note 8 – Commitments and Contingencies | score=7.227
+  Apple Q2 FY2023 | Note 9 – Commitments and Contingencies | score=7.147
+  Apple Q3 FY2023 | Note 9 – Commitments and Contingencies | score=7.093
+  Apple Q1 FY2023 | Note 8 – Commitments and Contingencies | score=6.958
+  Apple Q3 FY2022 | Contingencies | score=6.118
+
+================================================================================
+QUERY: What is disclosed in Item 3 Quantitative and Qualitative Disclosures About Market Risk for Amazon Q1 2023?
+Expected: Amazon Q1 FY2023 | keyword='Market Risk'
+
+-- Vector-only top 5 --
+  Microsoft Q1 FY2023 | ITEM 3. QUANTITATIVE AND QUALITATIVE DISCLOSURES ABOUT MARKET RISK
+  Amazon Q3 FY2023 | Item 3. Quantitative and Qualitative Disclosures About Market Risk
+  Microsoft Q3 FY2023 | ITEM 3. QUANTITATIVE AND QUALITATIVE DISCLOSURES ABOUT MARKET RISK
+  Amazon Q1 FY2023 | Item 3. Quantitative and Qualitative Disclosures About Market Risk
+  Microsoft Q2 FY2023 | ITEM 3. QUANTITATIVE AND QUALITATIVE DISCLOSURES ABOUT MARKET RISK
+
+-- Hybrid+rerank top 5 --
+  Amazon Q1 FY2023 | Item 3. Quantitative and Qualitative Disclosures About Market Risk | score=9.855
+  Amazon Q3 FY2023 | Item 3. Quantitative and Qualitative Disclosures About Market Risk | score=9.778
+  Amazon Q3 FY2022 | Item 3. Quantitative and Qualitative Disclosures About Market Risk | score=9.747
+  Amazon Q2 FY2023 | Item 3. Quantitative and Qualitative Disclosures About Market Risk | score=9.726
+  Apple Q1 FY2023 | Item 3. Quantitative and Qualitative Disclosures About Market Risk | score=8.117
+
+================================================================================
+QUERY: What does Intel disclose about restructuring in Q3 2022?
+Expected: Intel Q3 FY2022 | keyword='Restructuring'
+
+-- Vector-only top 5 --
+  Intel Q3 FY2023 | Note 6 : Restructuring and Other Charges
+  Intel Q3 FY2023 | Forward-Looking Statements
+  Intel Q1 FY2023 | Note 6 : Restructuring and Other Charges
+  Intel Q3 FY2023 | Restructuring and Other Charges
+  Intel Q1 FY2023 | Total restructuring and other charges
+
+-- Hybrid+rerank top 5 --
+  Intel Q1 FY2023 | Total restructuring and other charges | score=6.682
+  Intel Q2 FY2023 | Note 6 : Restructuring and Other Charges | score=6.298
+  Intel Q1 FY2023 | Note 6 : Restructuring and Other Charges | score=5.950
+  Intel Q1 FY2023 | Restructuring and Other Charges | score=5.932
+  Intel Q3 FY2022 | Note 2 : Operating Segments | score=5.822
+
+================================================================================
+QUERY: What are Microsoft's legal proceedings mentioned in Q2 2023?
+Expected: Microsoft Q2 FY2023 | keyword='Legal Proceedings|Item 1|Financial Statements'
+
+-- Vector-only top 5 --
+  Microsoft Q2 FY2023 | (Unaudited)
+  Microsoft Q2 FY2023 | Item 2
+  Microsoft Q3 FY2023 | Item 2
+  Microsoft Q2 FY2023 | Item 3, 4
+  Microsoft Q3 FY2022 | (Unaudited)
+
+-- Hybrid+rerank top 5 --
+  Microsoft Q2 FY2023 | Financial Instruments | score=3.677
+  Microsoft Q2 FY2023 | (Unaudited) | score=3.397
+  Microsoft Q3 FY2022 | (Unaudited) | score=3.263
+  Microsoft Q2 FY2023 | ITEM 1. FINANCIAL STATEMENTS | score=2.907
+  Microsoft Q1 FY2023 | (Unaudited) | score=2.850
+
+================================================================================
+QUERY: What does NVIDIA say about segment information in Q1 2023?
+Expected: NVIDIA Q1 FY2023 | keyword='Segment|Financial Information'
+
+-- Vector-only top 5 --
+  NVIDIA Q1 FY2023 | PART I. FINANCIAL INFORMATION
+  NVIDIA Q1 FY2023 | PART II. OTHER INFORMATION
+  NVIDIA Q3 FY2023 | PART I. FINANCIAL INFORMATION
+  NVIDIA Q3 FY2023 | PART II. OTHER INFORMATION
+  NVIDIA Q3 FY2022 | PART I. FINANCIAL INFORMATION
+
+-- Hybrid+rerank top 5 --
+  NVIDIA Q1 FY2023 | PART I. FINANCIAL INFORMATION | score=2.963
+  NVIDIA Q1 FY2023 | PART II. OTHER INFORMATION | score=2.917
+  NVIDIA Q3 FY2023 | PART II. OTHER INFORMATION | score=2.515
+  NVIDIA Q3 FY2023 | PART I. FINANCIAL INFORMATION | score=2.494
+  NVIDIA Q2 FY2023 | PART I. FINANCIAL INFORMATION | score=2.479
+
+================================================================================
+QUERY: What is Apple's earnings per share figure in Q1 2023?
+Expected: Apple Q1 FY2023 | keyword='Earnings Per Share'
+
+-- Vector-only top 5 --
+  Apple Q3 FY2022 | Earnings Per Share
+  Apple Q3 FY2023 | Earnings Per Share
+  Apple Q1 FY2023 | Earnings Per Share
+  Apple Q3 FY2023 | CONDENSED CONSOLIDATED STATEMENTS OF OPERATIONS (Unaudited)
+  Apple Q2 FY2023 | Earnings Per Share
+
+-- Hybrid+rerank top 5 --
+  Apple Q1 FY2023 | Earnings Per Share | score=8.952
+  Apple Q3 FY2022 | Earnings Per Share | score=8.426
+  Apple Q2 FY2023 | Earnings Per Share | score=8.379
+  Apple Q3 FY2023 | Earnings Per Share | score=8.360
+  Apple Q3 FY2023 | CONDENSED CONSOLIDATED STATEMENTS OF SHAREHOLDERS’ EQUITY (Unaudited) | score=6.005
+
+================================================================================
+QUERY: What does Amazon disclose about leases in Q3 2023?
+Expected: Amazon Q3 FY2023 | keyword='Leases'
+
+-- Vector-only top 5 --
+  Amazon Q3 FY2023 | Note 3 — LEASES
+  Amazon Q3 FY2022 | Note 3 — LEASES
+  Amazon Q2 FY2023 | Note 3 — LEASES
+  Amazon Q1 FY2023 | Note 3 — LEASES
+  Amazon Q3 FY2023 | Commitments
+
+-- Hybrid+rerank top 5 --
+  Amazon Q3 FY2023 | Note 3 — LEASES | score=5.599
+  Amazon Q3 FY2023 | Use of Estimates | score=5.493
+  Amazon Q3 FY2022 | Note 3 — LEASES | score=5.320
+  Amazon Q2 FY2023 | Note 3 — LEASES | score=5.300
+  Amazon Q1 FY2023 | Note 3 — LEASES | score=5.247
+
+================================================================================
+QUERY: What is Intel's effective tax rate mentioned in Q1 2023?
+Expected: Intel Q1 FY2023 | keyword='Provision for Taxes|Income Taxes|Tax'
+
+-- Vector-only top 5 --
+  Intel Q1 FY2023 | Provision for Taxes
+  Intel Q3 FY2022 | Provision for (Benefit from) Taxes
+  Intel Q3 FY2023 | Provision for (Benefit from) Taxes
+  Intel Q2 FY2023 | Provision for (Benefit from) Taxes
+  Intel Q1 FY2023 | Revenue Summary
+
+-- Hybrid+rerank top 5 --
+  Intel Q1 FY2023 | Provision for Taxes | score=7.834
+  Intel Q3 FY2023 | Provision for (Benefit from) Taxes | score=6.815
+  Intel Q2 FY2023 | Note 7 : Income Taxes | score=6.657
+  Intel Q3 FY2023 | Note 7 : Income Taxes | score=6.649
+  Intel Q2 FY2023 | Provision for (Benefit from) Taxes | score=6.626
+
+================================================================================
+QUERY: What does Microsoft's contingencies note say in Q3 2023?
+Expected: Microsoft Q3 FY2023 | keyword='Contingencies'
+
+-- Vector-only top 5 --
+  Microsoft Q3 FY2023 | NOTE 13 — CONTINGENCIES
+  Microsoft Q3 FY2022 | NOTE 14 — CONTINGENCIES
+  Microsoft Q1 FY2023 | NOTE 14 — CONTINGENCIES
+  Microsoft Q2 FY2023 | NOTE 14 — CONTINGENCIES
+  Microsoft Q3 FY2022 | NOTE 4 — INVESTMENTS
+
+-- Hybrid+rerank top 5 --
+  Microsoft Q3 FY2023 | NOTE 13 — CONTINGENCIES | score=6.979
+  Microsoft Q3 FY2022 | NOTE 14 — CONTINGENCIES | score=6.729
+  Microsoft Q1 FY2023 | NOTE 14 — CONTINGENCIES | score=6.609
+  Microsoft Q2 FY2023 | NOTE 14 — CONTINGENCIES | score=6.527
+  Microsoft Q3 FY2023 | NOTE 1 — ACCOUNTING POLICIES | score=3.911
+
+================================================================================
+QUERY: What is NVIDIA's earnings per share in Q3 2023?
+Expected: NVIDIA Q3 FY2023 | keyword='Statements of Income|Income|Operating Income'
+
+-- Vector-only top 5 --
+  NVIDIA Q3 FY2023 | Third Quarter of Fiscal Year 2024 Summary
+  NVIDIA Q3 FY2023 | Revenue
+  NVIDIA Q3 FY2023 | NVIDIA CORPORATION AND SUBSIDIARIES CONDENSED CONSOLIDATED STATEMENTS OF INCOME (In millions, except per share data) (Unaudited)
+  NVIDIA Q3 FY2022 | NVIDIA CORPORATION AND SUBSIDIARIES NOTES TO CONDENSED CONSOLIDATED FINANCIAL STATEMENTS (Continued) (Unaudited)
+  NVIDIA Q3 FY2022 | Revenue
+
+-- Hybrid+rerank top 5 --
+  NVIDIA Q3 FY2022 | NVIDIA CORPORATION AND SUBSIDIARIES CONDENSED CONSOLIDATED STATEMENTS OF INCOME (In millions, except per share data) | score=6.514
+  NVIDIA Q3 FY2023 | NVIDIA CORPORATION AND SUBSIDIARIES CONDENSED CONSOLIDATED STATEMENTS OF INCOME (In millions, except per share data) (Unaudited) | score=6.413
+  NVIDIA Q2 FY2023 | NVIDIA CORPORATION AND SUBSIDIARIES CONDENSED CONSOLIDATED STATEMENTS OF INCOME (In millions, except per share data) (Unaudited) | score=6.149
+  NVIDIA Q3 FY2023 | Operating Income | score=6.147
+  NVIDIA Q3 FY2023 | NVIDIA CORPORATION AND SUBSIDIARIES CONDENSED CONSOLIDATED STATEMENTS OF SHAREHOLDERS’ EQUITY FOR THE THREE MONTHS ENDED OCTOBER 29, 2023 AND OCTOBER 30, 2022 (Unaudited) | score=6.051

@@ -1,0 +1,11 @@
+query,expected_company,expected_quarter,expected_year,expected_section_keyword
+What was Apple revenue in Q2 2023?,Apple,Q2,2023,Revenue
+What was Amazon's net income in Q1 2023?,Amazon,Q1,2023,Operations|Net Sales|Income
+What was Intel's operating expenses in Q3 2022?,Intel,Q3,2022,Operating Expenses
+What was Microsoft's total revenue in Q3 2023?,Microsoft,Q3,2023,Revenue|Operations|In millions
+What was NVIDIA's gross margin in Q1 2023?,NVIDIA,Q1,2023,Gross Margin
+What was Apple's cash and equivalents in Q3 2022?,Apple,Q3,2022,Cash
+What was Amazon's operating income in Q3 2023?,Amazon,Q3,2023,Operating Income|Operations
+What was Intel's revenue in Q1 2023?,Intel,Q1,2023,Revenue
+What was Microsoft's net income in Q2 2023?,Microsoft,Q2,2023,Income|Operations|In millions
+What was NVIDIA's revenue in Q3 2023?,NVIDIA,Q3,2023,Revenue

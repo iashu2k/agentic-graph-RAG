@@ -1,0 +1,11 @@
+query,expected_company,expected_quarter,expected_year,expected_section_keyword
+What does Apple's commitments and contingencies note say in Q3 2022?,Apple,Q3,2022,Commitments and Contingencies
+What is disclosed in Item 3 Quantitative and Qualitative Disclosures About Market Risk for Amazon Q1 2023?,Amazon,Q1,2023,Market Risk
+What does Intel disclose about restructuring in Q3 2022?,Intel,Q3,2022,Restructuring
+What are Microsoft's legal proceedings mentioned in Q2 2023?,Microsoft,Q2,2023,Legal Proceedings|Item 1|Financial Statements
+What does NVIDIA say about segment information in Q1 2023?,NVIDIA,Q1,2023,Segment|Financial Information
+What is Apple's earnings per share figure in Q1 2023?,Apple,Q1,2023,Earnings Per Share
+What does Amazon disclose about leases in Q3 2023?,Amazon,Q3,2023,Leases
+What is Intel's effective tax rate mentioned in Q1 2023?,Intel,Q1,2023,Provision for Taxes|Income Taxes|Tax
+What does Microsoft's contingencies note say in Q3 2023?,Microsoft,Q3,2023,Contingencies
+What is NVIDIA's earnings per share in Q3 2023?,NVIDIA,Q3,2023,Statements of Income|Income|Operating Income
