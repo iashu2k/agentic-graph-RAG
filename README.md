@@ -410,6 +410,24 @@ Two open questions were resolved at the start of Phase 3:
 
 **Source corpus:** 3,669 chunks across 20 filings (~183 chunks/filing average).
 
+### Checkpoint: Multi-Hop Relational Query Validated
+
+**Test:** "Which companies share a risk factor with Intel?" — a relationship question that pure vector search cannot structurally answer, since it requires traversing from one company to another *through* a shared disclosure, not just ranking chunks by similarity to the query text.
+
+**Query:**
+
+\`\`\`cypher
+MATCH (c1:Company {ticker: 'Intel'})-[:FILED]->(:Filing)-[:DISCLOSES]->(d1:Disclosure {category: 'risk_factor'})
+WHERE toLower(d1.description) CONTAINS 'supply chain'
+MATCH (c2:Company)-[:FILED]->(:Filing)-[:DISCLOSES]->(d2:Disclosure {category: 'risk_factor'})
+WHERE c2.ticker <> 'Intel' AND toLower(d2.description) CONTAINS 'supply chain'
+RETURN DISTINCT c2.ticker
+\`\`\`
+
+**Result:** Amazon, Apple, Microsoft, and NVIDIA — all four other companies in the corpus — share supply-chain risk language with Intel.
+
+**Why vector search can't do this:** a dense retriever embeds the query and returns chunks that *sound* related (most likely Intel's own risk section), but it has no mechanism to enforce a join condition like "return companies whose risk disclosures overlap with Intel's." That requires an explicit, traversable relationship between entities — exactly what the `(Company)-[:FILED]->(Filing)-[:DISCLOSES]->(Disclosure)` structure provides and flat similarity ranking cannot express. This is the core justification for Phase 3's existence, now empirically confirmed rather than just architecturally assumed.
+
 ### Known Limitation: Disclosure Node Deduplication (Not Blocking, Deferred)
 
 The relationship-to-node ratio for `Disclosure` is 21,058 / 16,608 ≈ 1.27 — meaning each unique disclosure description is on average reused only ~1.27 times across the whole corpus, despite substantial expected topical overlap across 5 companies × 4 quarters (e.g., boilerplate legal/risk language, recurring segment descriptions). Per-filing disclosure counts as high as 1,698 (Microsoft-2023-Q1) confirm this: `MERGE` on exact-string `description` barely deduplicates, because the LLM rephrases the same underlying fact differently on nearly every call, so semantically identical disclosures land as distinct nodes.
