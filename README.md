@@ -12,7 +12,7 @@ DeepFile combines an LLM agent (LangGraph) that plans/routes/self-corrects retri
 - **Keyword search:** Postgres full-text search (`tsvector`/`ts_rank`, BM25-style)
 - **Reranker:** Cross-encoder (`ms-marco-MiniLM-L-6-v2`, free/local via sentence-transformers)
 - **Knowledge graph:** Neo4j AuraDB (free tier) — built, Phase 3
-- **Agent orchestration:** LangGraph — in progress, Phase 4
+- **Agent orchestration:** LangGraph — built, Phase 4
 - **LLM:** Groq (Llama 3.3 70B / Llama 3.1 8B, with fallback models for quota exhaustion)
 - **Evaluation:** RAGAS — planned, Phase 5
 - **Observability:** Langfuse — planned, Phase 6
@@ -23,14 +23,14 @@ DeepFile combines an LLM agent (LangGraph) that plans/routes/self-corrects retri
 
 | Phase | Description | Status |
 |---|---|---|
-| 0 | Corpus + infra setup (accounts, DBs, project scaffold) | ✅ Complete |
-| 1 | Baseline RAG (plain vector search + generation) | ✅ Complete |
-| 2 | Hybrid search + reranking (BM25 + RRF + cross-encoder) | ✅ Complete |
-| 3 | Knowledge graph layer (entity/relationship extraction into Neo4j) | ✅ Complete |
-| 4 | Agentic router with self-correction loop (LangGraph) | 🔄 In progress |
-| 5 | Evaluation harness (RAGAS benchmark) | ⬜ Not started |
-| 6 | Observability + guardrails (Langfuse) | ⬜ Not started |
-| 7 | Incremental indexing (stretch) | ⬜ Not started |
+| 0 | Corpus + infra setup (accounts, DBs, project scaffold) | Complete |
+| 1 | Baseline RAG (plain vector search + generation) | Complete |
+| 2 | Hybrid search + reranking (BM25 + RRF + cross-encoder) | Complete |
+| 3 | Knowledge graph layer (entity/relationship extraction into Neo4j) | Complete |
+| 4 | Agentic router with self-correction loop (LangGraph) | Complete |
+| 5 | Evaluation harness (RAGAS benchmark) | Not started |
+| 6 | Observability + guardrails (Langfuse) | Not started |
+| 7 | Incremental indexing (stretch) | Not started |
 
 ---
 
@@ -57,7 +57,7 @@ Notes:
 
 **1. Postgres + pgvector — Supabase**
 - Project created at supabase.com
-- `vector` extension enabled (Database → Extensions)
+- `vector` extension enabled (Database -> Extensions)
 - `pg_trgm` extension also enabled (optional, for future fuzzy text matching)
 - Connection method: **Transaction pooler** (port 6543) — chosen since the FastAPI/agent workload is stateless and short-lived
 - Connection string stored in `.env` as `DATABASE_URL`
@@ -71,7 +71,7 @@ Notes:
 
 **3. LLM Inference — Groq**
 - Account created at console.groq.com
-- API key generated (Console → API Keys)
+- API key generated (Console -> API Keys)
 - Models used:
   - `llama-3.3-70b-versatile` — generation/reasoning steps
   - `llama-3.1-8b-instant` — lightweight tasks (query rewriting, entity/disclosure extraction)
@@ -87,7 +87,7 @@ deepfile/
 │ ├── processed/ # (future) cleaned/chunked text
 │ └── eval/ # sample_queries.csv, sample_queries_hard.csv, qna_data.csv
 ├── app/
-│ ├── main.py # FastAPI entry point
+│ ├── main.py # FastAPI entry point — wired to the Phase 4 agent
 │ ├── config.py # Settings (pydantic-settings)
 │ ├── ingestion/
 │ │ ├── parser.py # PDF parsing (unstructured, hi_res strategy)
@@ -107,7 +107,12 @@ deepfile/
 │ │ ├── validate_phase3.py # Cypher validation probes vs sample_queries_hard.csv
 │ │ ├── audit_graph.py # Node/relationship counts, duplicate/noise check
 │ │ └── .processed_ids.txt # Checkpoint file for extraction resume (gitignored)
-│ ├── agent/ # Phase 4 (in progress)
+│ ├── agent/ # Phase 4 — COMPLETE
+│ │ ├── graph_builder.py # LangGraph StateGraph definition, AgentState, compiled `agent`
+│ │ ├── router.py # router_node — classifies question as graph vs hybrid
+│ │ ├── retrieve.py # retrieve node — dispatches to graph_node / hybrid_node
+│ │ ├── rewrite.py # rewrite_node — LLM-based query reformulation on retry
+│ │ └── generate.py # generate_node — builds context chunks, calls llm_client
 │ ├── eval/ # Phase 5 (not yet implemented)
 │ ├── observability/ # Phase 6 (not yet implemented)
 │ ├── api/ # (folder reserved; routes currently in main.py)
@@ -118,7 +123,8 @@ deepfile/
 ├── scripts/
 │ ├── run_ingestion.py # CLI: loops over all 20 PDFs, parses + embeds + loads
 │ ├── evaluate_retrieval.py # Precision@5 comparison: vector-only vs hybrid+rerank
-│ └── diagnose_retrieval.py # Dumps actual top-5 results per query for debugging
+│ ├── diagnose_retrieval.py # Dumps actual top-5 results per query for debugging
+│ └── test_reroute.py # Isolated unit test of the rewrite -> re-route loop
 ├── notebooks/
 ├── tests/
 ├── .env
@@ -133,11 +139,11 @@ uv init deepfile --python 3.12
 cd deepfile
 
 uv add "unstructured[pdf]" fastapi uvicorn psycopg2-binary sqlalchemy pgvector \
-       sentence-transformers groq python-dotenv pydantic-settings pymupdf neo4j
+       sentence-transformers groq python-dotenv pydantic-settings pymupdf neo4j langgraph
 
 mkdir -p app/ingestion app/retrieval app/graph app/agent app/eval app/observability app/api app/services
 mkdir -p data/raw/sec-10-q/docs data/processed data/eval scripts notebooks tests
-touch scripts/__init__.py app/graph/__init__.py
+touch scripts/__init__.py app/graph/__init__.py app/agent/__init__.py
 ```
 
 System dependencies (macOS, required for `unstructured`'s `hi_res` PDF strategy):
@@ -191,9 +197,9 @@ settings = Settings()
 
 ---
 
-## Phase 1: Baseline RAG — COMPLETE ✅
+## Phase 1: Baseline RAG — COMPLETE
 
-**Goal:** Naive end-to-end pipeline — parse → chunk → embed → store → retrieve → generate — to establish a working demo and a baseline to measure later improvements against.
+**Goal:** Naive end-to-end pipeline — parse -> chunk -> embed -> store -> retrieve -> generate — to establish a working demo and a baseline to measure later improvements against.
 
 ### Pipeline Steps
 
@@ -243,7 +249,7 @@ curl -X POST http://localhost:8000/query \
 
 ---
 
-## Phase 2: Hybrid Search + Reranking — COMPLETE ✅
+## Phase 2: Hybrid Search + Reranking — COMPLETE
 
 **Goal:** Fix the Phase 1 quarter/year retrieval precision gap by combining keyword search with vector search, then reranking the fused candidates.
 
@@ -254,7 +260,7 @@ curl -X POST http://localhost:8000/query \
 3. **Keyword search** (`app/retrieval/keyword_search.py`) — `ts_rank`-based BM25-style scoring over `content_tsv`.
 4. **Reciprocal Rank Fusion** (`app/retrieval/fusion.py`) — fuses vector and keyword rankings purely by rank position, avoiding score-scale mismatches between cosine similarity and `ts_rank`.
 5. **Cross-encoder reranking** (`app/retrieval/reranker.py`) — `cross-encoder/ms-marco-MiniLM-L-6-v2` reranks the top ~20 fused candidates down to a final top-5.
-6. **Hybrid orchestrator** (`app/retrieval/hybrid_search.py`) — vector search → keyword search → RRF fusion → reranking, wired into `/query`.
+6. **Hybrid orchestrator** (`app/retrieval/hybrid_search.py`) — vector search -> keyword search -> RRF fusion -> reranking, wired into `/query`.
 
 ### Schema Changes
 
@@ -301,7 +307,7 @@ A "hit" requires the correct company, fiscal quarter, fiscal year, **and** a mat
 
 - **Microsoft section mis-titling:** `unstructured`'s `Title`-detection heuristic occasionally flags a units caption ("(In millions)") as the section header instead of the actual statement name (e.g., "CONDENSED CONSOLIDATED STATEMENTS OF OPERATIONS") for Microsoft's filings specifically — likely due to inconsistent font/bold styling in the source PDFs. A parsing quality gap, not a retrieval-ranking issue.
 - **Intel restructuring query miss:** Both vector-only and hybrid+rerank failed to surface the correct chunk for "What does Intel disclose about restructuring in Q3 2022?" — a shared parsing/chunking gap rather than a fusion or reranking failure.
-- **Rationale for deferring to Phase 3:** Both issues stem from fragile PDF layout-heuristic title detection, which a knowledge graph with explicit `Filing → Section/Disclosure` relationships sidesteps entirely by not depending on parser-inferred section titles for lookup precision. See Phase 3 for how both cases were ultimately resolved.
+- **Rationale for deferring to Phase 3:** Both issues stem from fragile PDF layout-heuristic title detection, which a knowledge graph with explicit `Filing -> Section/Disclosure` relationships sidesteps entirely by not depending on parser-inferred section titles for lookup precision. See Phase 3 for how both cases were ultimately resolved.
 
 ### Phase 2 Deliverables
 
@@ -333,7 +339,7 @@ curl -X POST http://localhost:8000/query \
 
 ---
 
-## Phase 3: Knowledge Graph Layer — COMPLETE ✅
+## Phase 3: Knowledge Graph Layer — COMPLETE
 
 **Goal:** Extract entities and relationships from the ingested 10-Q chunks into Neo4j, enabling multi-hop relational queries that don't depend on fragile PDF section-title parsing — directly targeting the two limitations left open at the end of Phase 2.
 
@@ -375,7 +381,7 @@ Two open questions were resolved at the start of Phase 3:
 - **Intel restructuring — real gap found:** the original extraction script (`extract_risk_factors.py`, since superseded) only processed chunks where `section ILIKE '%risk%'`. Intel's actual restructuring disclosures live in sections named "Note 5/6: Restructuring and Other Charges" and "Restructuring and Other Charges" — no "risk" substring — so they were never sent to the LLM for extraction at all. This was the true root cause of the persistent Intel miss, not a graph or Cypher problem.
 - **Long-term fix — full-corpus extraction:** rather than continuing to patch the section-keyword filter one missing category at a time (tax, legal, segment, etc. all faced the same risk), the extraction was redesigned to run over **every** chunk in the corpus with a generalized `Disclosure{category}` schema, replacing the narrowly-scoped `RiskFactor` label entirely. This eliminated the whack-a-mole pattern and is the version now in production.
 - **Groq daily token quota (TPD) exhaustion:** `llama-3.1-8b-instant`'s 500K tokens/day limit was hit mid-run during the full-corpus extraction (~3,669 chunks). Discovered that Groq tracks TPD per-model rather than account-wide, so switching to a different model (`openai/gpt-oss-20b`, then `meta-llama/llama-4-maverick-17b-128e-instruct`) drew from a separate quota pool and allowed the run to continue same-day rather than waiting ~24h. The `.processed_ids.txt` checkpoint file made every quota interruption non-destructive — the script simply resumed from the last completed chunk on rerun.
-- **Both original motivator cases now pass:** "Intel restructuring Q3 2022" and "Microsoft section titles Q2 2023" both return correct results in `evaluate_graph.py` after (a) fixing ticker→full-name literals and (b) full-corpus disclosure extraction.
+- **Both original motivator cases now pass:** "Intel restructuring Q3 2022" and "Microsoft section titles Q2 2023" both return correct results in `evaluate_graph.py` after (a) fixing ticker->full-name literals and (b) full-corpus disclosure extraction.
 
 ### Final Graph Statistics (from `audit_graph.py`)
 
@@ -416,13 +422,13 @@ Two open questions were resolved at the start of Phase 3:
 
 **Query:**
 
-\`\`\`cypher
+```cypher
 MATCH (c1:Company {ticker: 'Intel'})-[:FILED]->(:Filing)-[:DISCLOSES]->(d1:Disclosure {category: 'risk_factor'})
 WHERE toLower(d1.description) CONTAINS 'supply chain'
 MATCH (c2:Company)-[:FILED]->(:Filing)-[:DISCLOSES]->(d2:Disclosure {category: 'risk_factor'})
 WHERE c2.ticker <> 'Intel' AND toLower(d2.description) CONTAINS 'supply chain'
 RETURN DISTINCT c2.ticker
-\`\`\`
+```
 
 **Result:** Amazon, Apple, Microsoft, and NVIDIA — all four other companies in the corpus — share supply-chain risk language with Intel.
 
@@ -434,7 +440,7 @@ The relationship-to-node ratio for `Disclosure` is 21,058 / 16,608 ≈ 1.27 — 
 
 **Why this wasn't fixed immediately:** it's a graph-quality issue, not a correctness one — every node is individually accurate, both eval cases pass, and multi-hop queries work. Fixing it preemptively (before confirming it actually hurts Phase 4 agent output quality) risks solving a problem that hasn't been validated as impactful yet, consistent with the "don't over-fix on assumptions" lesson from Phase 2.
 
-**Planned fix if it becomes a real problem in Phase 4:** an embedding-based post-hoc deduplication pass — reuse the existing `bge-small-en-v1.5` embedding infrastructure to cluster near-duplicate `Disclosure` nodes within the same filing + category, then merge clusters into canonical nodes. Deferred until Phase 4's agent usage reveals whether node granularity actually degrades multi-hop reasoning quality in practice.
+**Status update from Phase 4:** the isolated re-routing test and end-to-end failure/rewrite/success test did not surface any observable degradation from this dedup gap, so the planned embedding-based post-hoc merge remains deferred rather than promoted to active work.
 
 ### Phase 3 Deliverables
 
@@ -458,6 +464,106 @@ uv run python -m app.graph.audit_graph        # node/relationship counts, dedup 
 
 ---
 
+## Phase 4: Agentic Router with Self-Correction Loop — COMPLETE
+
+**Goal:** Replace the single-path retrieval used in Phases 1–3 with a LangGraph agent that classifies each question, retrieves via the right path (graph vs. hybrid), self-corrects on empty or low-confidence results by rewriting the query and re-routing, and only then generates the final answer.
+
+### Graph Flow
+
+```
+router -> retrieve (graph_node | hybrid_node) -> needs_retry?
+                                                      |-- yes --> rewrite -> router (loop)
+                                                      |-- no  --> generate -> END
+```
+
+### What Was Implemented
+
+1. **`router_node`** (`app/agent/router.py`) — classifies the question into `graph` (relationship/comparison queries answerable from the knowledge graph) or `hybrid` (general document search).
+2. **`retrieve`** (`app/agent/retrieve.py`) — dispatches to `graph_node` (Cypher generation + execution) or `hybrid_node` (vector + keyword hybrid search) based on `route`.
+3. **`needs_retry`** (`app/agent/graph_builder.py`) — conditional edge; returns `True` if `graph_results` and `hybrid_results` are both empty, or if the top hybrid rerank score falls below the relevance threshold.
+4. **`rewrite_node`** (`app/agent/rewrite.py`) — on retry, asks the LLM to reformulate the question using more search-friendly phrasing, records `rewrite_reasoning`, increments `retry_count`, and stores the original question in `original_question`.
+5. **`generate_node`** (`app/agent/generate.py`) — builds context chunks from whichever result set is populated (graph results are flattened into readable chunks via `graph_result_to_chunk`) and calls `generate_answer`.
+
+Retry is capped by `max_retries` (default 2) to prevent infinite loops and unbounded Groq quota consumption.
+
+### Validation Performed
+
+1. **End-to-end failure -> rewrite -> success:** a vague question that failed hybrid retrieval was rewritten and re-answered successfully on retry.
+2. **Isolated re-routing unit test** (`scripts/test_reroute.py`) — bypassing the graph's fixed `router` entry point by calling `needs_retry`, `rewrite_node`, and `router_node` directly:
+   - Seeded a `hybrid` route with a deliberately low rerank score (-999).
+   - Confirmed `needs_retry` returned `True`.
+   - Confirmed `rewrite_node` reformulated the question ("Which companies share a risk factor with Intel?" -> "Which companies have a risk factor similar to Intel's?") and incremented `retry_count` from 0 to 1.
+   - Confirmed `router_node`, given the rewritten question, correctly re-classified the route from `hybrid` to `graph`.
+
+   This confirmed the agent doesn't just retry the same failed strategy — it can genuinely switch retrieval strategies mid-loop based on the rewritten question, not just repeat the original one.
+
+### Debugging Journey
+
+- **Testing re-routing via `agent.invoke()` initially gave misleading results:** seeding a mid-loop state (`route: "hybrid"`, fake low-score `hybrid_results`) directly into `agent.invoke()` didn't test what was intended — the compiled graph's entry point is always `router`, so it re-classified the question fresh before the seeded state was ever read, making the seeded `hybrid_results` dead data.
+- **Fix — bypass the entry point for unit testing:** rather than invoking the compiled graph, `scripts/test_reroute.py` calls `needs_retry`, `rewrite_node`, and `router_node` directly as plain functions, in sequence, on a manually constructed state dict. This isolates the exact mechanism under test without the graph's fixed entry point interfering.
+- **Confirmed this discrepancy doesn't affect production behavior:** every real `/query` call starts with `route: None`, so `router_node` legitimately runs first on every fresh question — the entry-point behavior is a test-harness-only concern, not a production bug.
+
+### Known Issue (Non-Blocking)
+
+Cypher generation via the LLM is not fully deterministic even at `temperature=0`; identical questions can occasionally return slightly different result sets across runs. Flagged for future investigation, does not block current functionality.
+
+### API Integration
+
+`POST /query` in `app/main.py` now invokes the compiled agent graph (`app.agent.graph_builder.agent`) directly, replacing the earlier direct `hybrid_retrieve` call used in Phases 1–3. The response schema surfaces the agent's internal trace — `route`, `retry_count`, and (when a retry occurred) `rewritten_question` and `rewrite_reasoning` — making the self-correction behavior visible to any API consumer rather than buried in server logs.
+
+**Example:**
+
+```bash
+curl -X POST http://localhost:8000/query \
+  -H "Content-Type: application/json" \
+  -d '{"question": "Did Intel fire people?"}'
+```
+
+```json
+{
+  "answer": "Yes, Intel underwent restructuring...",
+  "route": "hybrid",
+  "retry_count": 1,
+  "original_question": "Did Intel fire people?",
+  "rewritten_question": "Did Intel undergo restructuring?",
+  "rewrite_reasoning": "Rephrased using a more specific, search-friendly term."
+}
+```
+
+### Phase 4 Deliverables
+
+| Component | File |
+|---|---|
+| LangGraph StateGraph + AgentState + compiled agent | `app/agent/graph_builder.py` |
+| Router node (graph vs. hybrid classification) | `app/agent/router.py` |
+| Retrieve node (graph_node / hybrid_node dispatch) | `app/agent/retrieve.py` |
+| Rewrite node (query reformulation on retry) | `app/agent/rewrite.py` |
+| Generate node (context assembly + answer generation) | `app/agent/generate.py` |
+| Isolated re-routing unit test | `scripts/test_reroute.py` |
+| Updated `/query` endpoint (agent-wired) | `app/main.py` |
+
+### Running Phase 4
+
+```bash
+uv add langgraph
+uv run python -m scripts.test_reroute      # isolated rewrite -> re-route unit test
+uv run uvicorn app.main:app --reload
+```
+
+```bash
+curl -X POST http://localhost:8000/query \
+  -H "Content-Type: application/json" \
+  -d '{"question": "Which companies share a risk factor with Intel?"}'
+```
+
+### Next Steps
+
+- Investigate Cypher generation non-determinism.
+- Consider surfacing intermediate `graph_results`/`hybrid_results` in the API response for debugging/demo purposes.
+- Add integration tests covering the full `/query` endpoint (not just node-level unit tests).
+
+---
+
 ## Troubleshooting Log
 
 - **zsh `no matches found: unstructured[html]`** — zsh treats `[...]` as glob syntax; fix by quoting: `uv add "unstructured[pdf]"`.
@@ -472,13 +578,14 @@ uv run python -m app.graph.audit_graph        # node/relationship counts, dedup 
 - **Graph evaluation false "MISS" on both Intel and Microsoft cases** — hardcoded ticker symbols (`'INTC'`, `'MSFT'`) in Cypher `WHERE` clauses didn't match the graph's actual `Company.ticker` values (full names: `'Intel'`, `'Microsoft'`); fixed by verifying actual property values via `MATCH (c:Company) RETURN DISTINCT c.ticker` before writing eval queries.
 - **Intel restructuring still missing after ticker fix** — root cause was the extraction script's `WHERE section ILIKE '%risk%'` filter excluding Intel's restructuring-related sections (no "risk" substring in their titles); fixed by redesigning extraction to run over the full corpus regardless of section name (`extract_disclosures.py`), rather than patching the keyword filter incrementally.
 - **Groq `429 rate_limit_exceeded` on tokens-per-day (TPD)** — hit `llama-3.1-8b-instant`'s 500K daily token quota mid-extraction-run; the error's "try again in Xs" message was misleading near the ceiling since freed tokens get immediately re-consumed by the next request. Fixed short-term by switching to a different Groq model (separate quota pool per model, not account-wide) and long-term by making the extraction script checkpoint-resumable so daily quota resets don't require reprocessing.
+- **Re-routing test via `agent.invoke()` gave dead-data results** — seeding a mid-loop state directly into `agent.invoke()` was silently overwritten because the compiled graph's entry point is always `router`; fixed by testing `needs_retry`, `rewrite_node`, and `router_node` as isolated functions in `scripts/test_reroute.py` instead of through the compiled graph.
 
 ---
 
-## Ready for Phase 4
+## Ready for Phase 5
 
-Phases 0–3 are complete: infrastructure is provisioned, baseline vector RAG works end-to-end, hybrid search + reranking improved precision on exact-term queries, and a Neo4j knowledge graph (5 Company, 20 Filing, 2,272 Section, 16,608 Disclosure nodes) now supports multi-hop relational queries independent of fragile PDF title-detection heuristics. Both original Phase 2 motivator cases (Microsoft section mis-titling, Intel restructuring miss) are confirmed resolved via the graph.
+Phases 0–4 are complete: infrastructure is provisioned, baseline vector RAG works end-to-end, hybrid search + reranking improved precision on exact-term queries, a Neo4j knowledge graph (5 Company, 20 Filing, 2,272 Section, 16,608 Disclosure nodes) supports multi-hop relational queries, and a LangGraph agent now routes, retrieves, self-corrects, and generates answers end-to-end through `/query`. Both original Phase 2 motivator cases (Microsoft section mis-titling, Intel restructuring miss) remain confirmed resolved via the graph, and the Phase 4 self-correction loop has been validated both end-to-end and via an isolated re-routing unit test.
 
-One known limitation — `Disclosure` node deduplication (~1.27 relationship-to-node ratio, likely due to inconsistent LLM phrasing across extraction calls) — is documented but intentionally not fixed yet, pending confirmation that it actually degrades Phase 4 agent reasoning quality. A planned embedding-based post-hoc merge is the fix-in-waiting if needed.
+One known limitation — `Disclosure` node deduplication (~1.27 relationship-to-node ratio) — remains documented but unfixed; Phase 4 usage did not surface evidence that it degrades agent reasoning quality, so it stays deferred. A second known issue — non-deterministic Cypher generation at `temperature=0` — was newly surfaced in Phase 4 and is flagged for investigation but is non-blocking.
 
-**Next up (Phase 4, in progress):** an agentic router built with LangGraph that classifies each question as needing graph retrieval, hybrid search, or both; generates and validates Cypher for graph queries; fans out to the appropriate retrieval path(s); self-corrects on empty/low-confidence results; and generates a final citation-grounded answer — reusing `app/retrieval/hybrid_search.py` and `app/services/llm_client.py` from earlier phases, with a bounded retry count to avoid burning through Groq's daily quota on unbounded self-correction loops.
+**Next up (Phase 5, not started):** build a RAGAS evaluation harness against the 195 human-reviewed question-answer pairs in `qna_data.csv`, benchmarking the full agentic pipeline (router + graph/hybrid retrieval + self-correction + generation) on faithfulness, answer relevance, and context precision/recall — establishing a quantitative measure of whether Phase 3's knowledge graph and Phase 4's agentic loop actually improved end-to-end answer quality versus the Phase 2 hybrid-only baseline.

@@ -1,31 +1,49 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-from app.retrieval.hybrid_search import hybrid_retrieve
-from app.services.llm_client import generate_answer
+from app.agent.graph_builder import agent
 
-app = FastAPI(title="DeepFile - Phase 2 Hybrid Search RAG")
+app = FastAPI(title="DeepFile", version="0.4.0")
 
 
 class QueryRequest(BaseModel):
   question: str
-  top_k: int = 5
 
 
-@app.post("/query")
-def query(req: QueryRequest):
-  chunks = hybrid_retrieve(req.question, final_k=req.top_k)
-  answer = generate_answer(req.question, chunks)
-  return {
-      "answer": answer,
-      "sources": [
-          {"company": c["company"], "filing_type": c["filing_type"],
-           "fiscal_year": c["fiscal_year"], "fiscal_quarter": c["fiscal_quarter"],
-           "section": c["section"], "rerank_score": round(c.get("rerank_score", 0), 3)}
-          for c in chunks
-      ]
-  }
+class QueryResponse(BaseModel):
+  answer: str
+  route: str
+  retry_count: int
+  original_question: str | None = None
+  rewritten_question: str | None = None
+  rewrite_reasoning: str | None = None
 
 
 @app.get("/health")
 def health():
   return {"status": "ok"}
+
+
+@app.post("/query", response_model=QueryResponse)
+def query(request: QueryRequest):
+  result = agent.invoke({
+      "question": request.question,
+      "original_question": None,
+      "rewrite_reasoning": None,
+      "route": None,
+      "cypher_query": None,
+      "graph_results": [],
+      "hybrid_results": [],
+      "context": "",
+      "answer": "",
+      "retry_count": 0,
+      "max_retries": 2,
+  })
+
+  return QueryResponse(
+      answer=result["answer"],
+      route=result["route"],
+      retry_count=result["retry_count"],
+      original_question=result.get("original_question"),
+      rewritten_question=result["question"] if result["retry_count"] > 0 else None,
+      rewrite_reasoning=result.get("rewrite_reasoning"),
+  )
