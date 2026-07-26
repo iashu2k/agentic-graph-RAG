@@ -2,7 +2,7 @@
 
 **Agentic GraphRAG research assistant over SEC 10-Q filings**
 
-DeepFile combines an LLM agent (LangGraph) that plans/routes/self-corrects retrieval with a knowledge graph (Neo4j) for multi-hop relational reasoning, layered on top of hybrid vector + keyword search (pgvector + Postgres full-text). The domain is SEC 10-Q filings for five major tech companies, where relationships between entities (companies, filings, notes, risk factors) require multi-hop reasoning that plain vector RAG cannot handle.
+DeepFile combines an LLM agent (LangGraph) that plans/routes/self-corrects retrieval with a knowledge graph (Neo4j) for multi-hop relational reasoning, layered on top of hybrid vector + keyword search (pgvector + Postgres full-text). The domain is SEC 10-Q filings for five major tech companies, where relationships between entities (companies, filings, notes, disclosures) require multi-hop reasoning that plain vector RAG cannot handle.
 
 ---
 
@@ -11,9 +11,9 @@ DeepFile combines an LLM agent (LangGraph) that plans/routes/self-corrects retri
 - **Vector store:** pgvector via Supabase (free tier)
 - **Keyword search:** Postgres full-text search (`tsvector`/`ts_rank`, BM25-style)
 - **Reranker:** Cross-encoder (`ms-marco-MiniLM-L-6-v2`, free/local via sentence-transformers)
-- **Knowledge graph:** Neo4j AuraDB (free tier) — planned, Phase 3
-- **Agent orchestration:** LangGraph — planned, Phase 4
-- **LLM:** Groq (Llama 3.3 70B / Llama 3.1 8B)
+- **Knowledge graph:** Neo4j AuraDB (free tier) — built, Phase 3
+- **Agent orchestration:** LangGraph — in progress, Phase 4
+- **LLM:** Groq (Llama 3.3 70B / Llama 3.1 8B, with fallback models for quota exhaustion)
 - **Evaluation:** RAGAS — planned, Phase 5
 - **Observability:** Langfuse — planned, Phase 6
 - **API layer:** FastAPI
@@ -26,8 +26,8 @@ DeepFile combines an LLM agent (LangGraph) that plans/routes/self-corrects retri
 | 0 | Corpus + infra setup (accounts, DBs, project scaffold) | ✅ Complete |
 | 1 | Baseline RAG (plain vector search + generation) | ✅ Complete |
 | 2 | Hybrid search + reranking (BM25 + RRF + cross-encoder) | ✅ Complete |
-| 3 | Knowledge graph layer (entity/relationship extraction into Neo4j) | ⬜ Not started |
-| 4 | Agentic router with self-correction loop (LangGraph) | ⬜ Not started |
+| 3 | Knowledge graph layer (entity/relationship extraction into Neo4j) | ✅ Complete |
+| 4 | Agentic router with self-correction loop (LangGraph) | 🔄 In progress |
 | 5 | Evaluation harness (RAGAS benchmark) | ⬜ Not started |
 | 6 | Observability + guardrails (Langfuse) | ⬜ Not started |
 | 7 | Incremental indexing (stretch) | ⬜ Not started |
@@ -51,6 +51,7 @@ Notes:
 - All 5 companies are big tech — no cross-sector relational questions are testable with this corpus alone.
 - Only 10-Q filings are present — no full fiscal year (10-K) data, limiting certain temporal/annual questions.
 - `raw_questions/questions_with_LLM_answers.csv` contains **unverified** GPT-4-Turbo draft answers and should NOT be used as ground truth — only `qna_data.csv` is human-reviewed.
+- **Important data caveat (discovered in Phase 3):** the `chunks.company` Postgres column (and the `Company.ticker` graph property) stores FULL COMPANY NAMES, not ticker symbols — `'Microsoft'`, `'Apple'`, `'Intel'`, `'Amazon'`, `'NVIDIA'`, not `'MSFT'`/`'AAPL'`/`'INTC'`/`'AMZN'`/`'NVDA'`. Any SQL or Cypher filtering by company must use these exact full-name strings.
 
 ### Free-Tier Infrastructure
 
@@ -66,15 +67,16 @@ Notes:
 - Credentials (URI, username, password) downloaded and saved at creation time
 - Verified connection via Neo4j Browser with `RETURN 1`
 - Credentials stored in `.env` as `NEO4J_URI`, `NEO4J_USERNAME`, `NEO4J_PASSWORD`, `NEO4J_DATABASE`
+- **Now populated** — see Phase 3 below for final node/relationship counts
 
 **3. LLM Inference — Groq**
 - Account created at console.groq.com
 - API key generated (Console → API Keys)
 - Models used:
   - `llama-3.3-70b-versatile` — generation/reasoning steps
-  - `llama-3.1-8b-instant` — lightweight tasks (future: query rewriting, extraction)
+  - `llama-3.1-8b-instant` — lightweight tasks (query rewriting, entity/disclosure extraction)
+  - `openai/gpt-oss-20b`, `meta-llama/llama-4-maverick-17b-128e-instruct` — fallback models used during Phase 3 when primary models hit their daily token quota (Groq tracks TPD limits per-model, not account-wide, so switching models unblocks same-day)
 - Key stored in `.env` as `GROQ_API_KEY`
-
 
 ### Project Structure
 
@@ -98,14 +100,21 @@ deepfile/
 │ │ ├── fusion.py # Reciprocal Rank Fusion
 │ │ ├── reranker.py # Cross-encoder reranking
 │ │ └── hybrid_search.py # Orchestrates vector + keyword + RRF + rerank
-│ ├── graph/ # Phase 3 (not yet implemented)
-│ ├── agent/ # Phase 4 (not yet implemented)
+│ ├── graph/ # Phase 3 — COMPLETE
+│ │ ├── bootstrap.py # Metadata-based bootstrap (Company/Filing/Section from Postgres)
+│ │ ├── extract_disclosures.py # Full-corpus LLM extraction -> Disclosure nodes, checkpointed
+│ │ ├── build_graph.py # Orchestrator: bootstrap -> extraction
+│ │ ├── validate_phase3.py # Cypher validation probes vs sample_queries_hard.csv
+│ │ ├── audit_graph.py # Node/relationship counts, duplicate/noise check
+│ │ └── .processed_ids.txt # Checkpoint file for extraction resume (gitignored)
+│ ├── agent/ # Phase 4 (in progress)
 │ ├── eval/ # Phase 5 (not yet implemented)
 │ ├── observability/ # Phase 6 (not yet implemented)
 │ ├── api/ # (folder reserved; routes currently in main.py)
 │ └── services/
 │ ├── llm_client.py # Groq client wrapper
-│ └── db.py # Postgres connection + schema init
+│ ├── db.py # Postgres connection (get_conn()) + schema init
+│ └── graph_db.py # Neo4j connection wrapper (execute_read/execute_write via driver.execute_query)
 ├── scripts/
 │ ├── run_ingestion.py # CLI: loops over all 20 PDFs, parses + embeds + loads
 │ ├── evaluate_retrieval.py # Precision@5 comparison: vector-only vs hybrid+rerank
@@ -124,11 +133,11 @@ uv init deepfile --python 3.12
 cd deepfile
 
 uv add "unstructured[pdf]" fastapi uvicorn psycopg2-binary sqlalchemy pgvector \
-       sentence-transformers groq python-dotenv pydantic-settings pymupdf
+       sentence-transformers groq python-dotenv pydantic-settings pymupdf neo4j
 
 mkdir -p app/ingestion app/retrieval app/graph app/agent app/eval app/observability app/api app/services
 mkdir -p data/raw/sec-10-q/docs data/processed data/eval scripts notebooks tests
-touch scripts/__init__.py
+touch scripts/__init__.py app/graph/__init__.py
 ```
 
 System dependencies (macOS, required for `unstructured`'s `hi_res` PDF strategy):
@@ -288,11 +297,11 @@ A "hit" requires the correct company, fiscal quarter, fiscal year, **and** a mat
 
 **Interpretation:** Aggregate precision is statistically tied, but the composition of results confirms the Phase 2 goal — hybrid+rerank wins specifically on hard queries requiring exact-term matching (e.g., correctly surfacing Amazon's "Item 3 – Quantitative and Qualitative Disclosures About Market Risk" at rank 1 vs. rank 4 for vector-only, and rescuing "Microsoft's legal proceedings," which vector-only missed entirely). The single hybrid regression (Intel revenue Q1 2023) is an isolated, low-stakes case on an already-easy query rather than a systemic flaw.
 
-### Known Limitations (Left Unfixed — Candidates for Phase 3)
+### Known Limitations (Left Unfixed at Phase 2 Close — Resolved in Phase 3)
 
 - **Microsoft section mis-titling:** `unstructured`'s `Title`-detection heuristic occasionally flags a units caption ("(In millions)") as the section header instead of the actual statement name (e.g., "CONDENSED CONSOLIDATED STATEMENTS OF OPERATIONS") for Microsoft's filings specifically — likely due to inconsistent font/bold styling in the source PDFs. A parsing quality gap, not a retrieval-ranking issue.
 - **Intel restructuring query miss:** Both vector-only and hybrid+rerank failed to surface the correct chunk for "What does Intel disclose about restructuring in Q3 2022?" — a shared parsing/chunking gap rather than a fusion or reranking failure.
-- **Rationale for not fixing now:** Both issues stem from fragile PDF layout-heuristic title detection, which a knowledge graph with explicit `Filing → Section → NoteType` relationships (Phase 3) would sidestep entirely by not depending on parser-inferred section titles for lookup precision.
+- **Rationale for deferring to Phase 3:** Both issues stem from fragile PDF layout-heuristic title detection, which a knowledge graph with explicit `Filing → Section/Disclosure` relationships sidesteps entirely by not depending on parser-inferred section titles for lookup precision. See Phase 3 for how both cases were ultimately resolved.
 
 ### Phase 2 Deliverables
 
@@ -324,21 +333,134 @@ curl -X POST http://localhost:8000/query \
 
 ---
 
+## Phase 3: Knowledge Graph Layer — COMPLETE ✅
+
+**Goal:** Extract entities and relationships from the ingested 10-Q chunks into Neo4j, enabling multi-hop relational queries that don't depend on fragile PDF section-title parsing — directly targeting the two limitations left open at the end of Phase 2.
+
+### What Was Implemented
+
+1. **Neo4j connection wrapper** (`app/services/graph_db.py`) — driver wrapper using the modern `driver.execute_query()` API (rather than manual session management) with `execute_read`/`execute_write` helpers and `init_constraints()` for schema setup.
+2. **Metadata bootstrap** (`app/graph/bootstrap.py`) — deterministic, zero-LLM-cost pass pulling `DISTINCT (company, filing_type, fiscal_year, fiscal_quarter, section)` from Postgres `chunks`, creating `Company`/`Filing`/`Section` nodes plus `FILED`/`HAS_SECTION` relationships. Bootstrapped 2,272 distinct filing/section rows.
+3. **Full-corpus disclosure extraction** (`app/graph/extract_disclosures.py`) — LLM-based extraction (Groq `llama-3.1-8b-instant`, with fallback models on quota exhaustion) run over **every** chunk regardless of section name, using a category-aware prompt (`risk_factor`, `restructuring`, `financial_metric`, `legal_proceeding`, `tax`, `segment`, `other`). Writes `Disclosure{description, category}` nodes and `DISCLOSES` relationships. Checkpointed via `.processed_ids.txt` so Groq daily-quota interruptions don't require restarting from scratch.
+4. **Build orchestrator** (`app/graph/build_graph.py`) — runs bootstrap then extraction in one command.
+5. **Validation script** (`app/graph/validate_phase3.py`) — Cypher probes against multiple companies/categories, going beyond the two original motivator cases.
+6. **Audit script** (`app/graph/audit_graph.py`) — node/relationship counts and per-filing disclosure-count distribution to surface deduplication quality.
+
+### Neo4j Graph Schema
+
+**Nodes:**
+- `Company {ticker}` — property name is `ticker` but the value is the full company name (see data caveat above)
+- `Filing {filing_id, fiscal_year, fiscal_quarter, filing_type}` — `filing_id` format: `"{company}-{fiscal_year}-{fiscal_quarter}"`, e.g. `"Intel-2022-Q3"`
+- `Section {filing_id, name}` — composite-unique per filing
+- `Disclosure {description, category}` — category ∈ `{risk_factor, restructuring, financial_metric, legal_proceeding, tax, segment, other}`
+
+**Relationships:**
+- `(Company)-[:FILED]->(Filing)`
+- `(Filing)-[:HAS_SECTION]->(Section)`
+- `(Filing)-[:DISCLOSES]->(Disclosure)`
+
+**Constraints:** `Company.ticker` unique, `Filing.filing_id` unique, `Section (filing_id, name)` composite unique.
+
+### Design Decision: Metadata Bootstrap First, Then Full-Corpus LLM Extraction
+
+Two open questions were resolved at the start of Phase 3:
+
+1. **Bootstrap vs. LLM extraction:** chose to bootstrap structural nodes (Company/Filing/Section) from existing Postgres metadata columns first — free, deterministic, immediately queryable — then layer LLM-based `Disclosure` extraction as a separate pass. Keeping these decoupled made debugging significantly easier than a single combined step.
+2. **Fix Microsoft/Intel directly vs. stretch goal:** treated as a natural validation target rather than a dedicated fix — the graph schema itself (querying by structured `Section`/`Disclosure` nodes instead of fuzzy section-title string matching) was expected to resolve both cases as a side effect, which it did (see Debugging Journey below).
+3. **Agent routing stub:** deferred entirely to Phase 4, to avoid coupling graph construction to agent design decisions not yet made.
+
+### Debugging Journey
+
+- **Initial evaluation false negatives:** the first `validate_phase3`/eval queries hardcoded ticker symbols (`'INTC'`, `'MSFT'`) as the `Company.ticker` property value, but the graph (mirroring Postgres) actually stores full company names (`'Intel'`, `'Microsoft'`). This caused both the Intel and Microsoft validation cases to falsely report "MISS" even though the underlying data was correct — resolved by using full names in all graph queries. Same "verify what's actually in the DB before assuming a bug is in logic" lesson from Phase 2 recurred here.
+- **Intel restructuring — real gap found:** the original extraction script (`extract_risk_factors.py`, since superseded) only processed chunks where `section ILIKE '%risk%'`. Intel's actual restructuring disclosures live in sections named "Note 5/6: Restructuring and Other Charges" and "Restructuring and Other Charges" — no "risk" substring — so they were never sent to the LLM for extraction at all. This was the true root cause of the persistent Intel miss, not a graph or Cypher problem.
+- **Long-term fix — full-corpus extraction:** rather than continuing to patch the section-keyword filter one missing category at a time (tax, legal, segment, etc. all faced the same risk), the extraction was redesigned to run over **every** chunk in the corpus with a generalized `Disclosure{category}` schema, replacing the narrowly-scoped `RiskFactor` label entirely. This eliminated the whack-a-mole pattern and is the version now in production.
+- **Groq daily token quota (TPD) exhaustion:** `llama-3.1-8b-instant`'s 500K tokens/day limit was hit mid-run during the full-corpus extraction (~3,669 chunks). Discovered that Groq tracks TPD per-model rather than account-wide, so switching to a different model (`openai/gpt-oss-20b`, then `meta-llama/llama-4-maverick-17b-128e-instruct`) drew from a separate quota pool and allowed the run to continue same-day rather than waiting ~24h. The `.processed_ids.txt` checkpoint file made every quota interruption non-destructive — the script simply resumed from the last completed chunk on rerun.
+- **Both original motivator cases now pass:** "Intel restructuring Q3 2022" and "Microsoft section titles Q2 2023" both return correct results in `evaluate_graph.py` after (a) fixing ticker→full-name literals and (b) full-corpus disclosure extraction.
+
+### Final Graph Statistics (from `audit_graph.py`)
+
+**Node counts:**
+
+| Label | Count |
+|---|---|
+| Company | 5 |
+| Filing | 20 |
+| Section | 2,272 |
+| Disclosure | 16,608 |
+
+**Disclosure count by category:**
+
+| Category | Count |
+|---|---|
+| financial_metric | 6,920 |
+| risk_factor | 5,456 |
+| other | 1,583 |
+| segment | 942 |
+| legal_proceeding | 717 |
+| tax | 572 |
+| restructuring | 418 |
+
+**Relationship counts:**
+
+| Type | Count |
+|---|---|
+| DISCLOSES | 21,058 |
+| HAS_SECTION | 2,272 |
+| FILED | 20 |
+
+**Source corpus:** 3,669 chunks across 20 filings (~183 chunks/filing average).
+
+### Known Limitation: Disclosure Node Deduplication (Not Blocking, Deferred)
+
+The relationship-to-node ratio for `Disclosure` is 21,058 / 16,608 ≈ 1.27 — meaning each unique disclosure description is on average reused only ~1.27 times across the whole corpus, despite substantial expected topical overlap across 5 companies × 4 quarters (e.g., boilerplate legal/risk language, recurring segment descriptions). Per-filing disclosure counts as high as 1,698 (Microsoft-2023-Q1) confirm this: `MERGE` on exact-string `description` barely deduplicates, because the LLM rephrases the same underlying fact differently on nearly every call, so semantically identical disclosures land as distinct nodes.
+
+**Why this wasn't fixed immediately:** it's a graph-quality issue, not a correctness one — every node is individually accurate, both eval cases pass, and multi-hop queries work. Fixing it preemptively (before confirming it actually hurts Phase 4 agent output quality) risks solving a problem that hasn't been validated as impactful yet, consistent with the "don't over-fix on assumptions" lesson from Phase 2.
+
+**Planned fix if it becomes a real problem in Phase 4:** an embedding-based post-hoc deduplication pass — reuse the existing `bge-small-en-v1.5` embedding infrastructure to cluster near-duplicate `Disclosure` nodes within the same filing + category, then merge clusters into canonical nodes. Deferred until Phase 4's agent usage reveals whether node granularity actually degrades multi-hop reasoning quality in practice.
+
+### Phase 3 Deliverables
+
+| Component | File |
+|---|---|
+| Neo4j connection wrapper | `app/services/graph_db.py` |
+| Metadata bootstrap (Company/Filing/Section) | `app/graph/bootstrap.py` |
+| Full-corpus disclosure extraction (checkpointed) | `app/graph/extract_disclosures.py` |
+| Build orchestrator | `app/graph/build_graph.py` |
+| Cypher validation probes | `app/graph/validate_phase3.py` |
+| Graph audit (counts, dedup check) | `app/graph/audit_graph.py` |
+
+### Running Phase 3
+
+```bash
+uv add neo4j
+uv run python -m app.graph.build_graph        # bootstrap + full-corpus extraction
+uv run python -m app.graph.validate_graph     # broader Cypher validation
+uv run python -m app.graph.audit_graph        # node/relationship counts, dedup check
+```
+
+---
+
 ## Troubleshooting Log
 
 - **zsh `no matches found: unstructured[html]`** — zsh treats `[...]` as glob syntax; fix by quoting: `uv add "unstructured[pdf]"`.
-- **`ModuleNotFoundError: No module named 'app'`** — occurred running `python scripts/run_ingestion.py` directly; fixed by running as a module: `uv run python -m scripts.run_ingestion` (requires `scripts/__init__.py`).
+- **`ModuleNotFoundError: No module named 'app'`** — occurred running `python scripts/run_ingestion.py` directly; fixed by running as a module: `uv run python -m scripts.run_ingestion` (requires `scripts/__init__.py`, and similarly `app/graph/__init__.py` for Phase 3 modules).
 - **pydantic `ValidationError: Extra inputs are not permitted`** — `pydantic-settings` rejects `.env` variables not declared as `Settings` fields; fixed by explicitly declaring all Neo4j/model fields in `app/config.py`.
 - **`tesseract is not installed or it's not in your PATH`** — `unstructured`'s `hi_res` strategy requires OCR; fixed via `brew install tesseract poppler` (macOS).
 - **Slow `hi_res` ingestion** — OCR + YOLOX layout inference per page is compute-heavy; a faster `strategy="fast"` alternative was evaluated but **not adopted**, since table extraction fidelity matters more than speed for financial statements in this project.
 - **`content_tsv` NULL for existing rows** — the Postgres trigger only fires on new inserts/updates, not retroactively; fixed by truncating and re-ingesting after adding `search_text` and the trigger.
 - **Evaluation metric too lenient (100%/100% false positive)** — initial `is_hit()` only checked company/quarter/year, so any chunk from the correct filing counted as a hit regardless of section; fixed by requiring a matching section keyword.
 - **Evaluation metric too strict (60%/60% false negative)** — single hardcoded keywords per query didn't match real, inconsistently-titled section names across companies; fixed by switching to pipe-separated OR-matching keywords derived from actual `SELECT DISTINCT section` output.
+- **`ImportError: cannot import name 'get_connection' from 'app.services.db'`** — assumed a function name (`get_connection`) that didn't match the actual export (`get_conn`); fixed by checking the real `db.py` source before writing dependent modules, and updating imports to use `get_conn`.
+- **Graph evaluation false "MISS" on both Intel and Microsoft cases** — hardcoded ticker symbols (`'INTC'`, `'MSFT'`) in Cypher `WHERE` clauses didn't match the graph's actual `Company.ticker` values (full names: `'Intel'`, `'Microsoft'`); fixed by verifying actual property values via `MATCH (c:Company) RETURN DISTINCT c.ticker` before writing eval queries.
+- **Intel restructuring still missing after ticker fix** — root cause was the extraction script's `WHERE section ILIKE '%risk%'` filter excluding Intel's restructuring-related sections (no "risk" substring in their titles); fixed by redesigning extraction to run over the full corpus regardless of section name (`extract_disclosures.py`), rather than patching the keyword filter incrementally.
+- **Groq `429 rate_limit_exceeded` on tokens-per-day (TPD)** — hit `llama-3.1-8b-instant`'s 500K daily token quota mid-extraction-run; the error's "try again in Xs" message was misleading near the ceiling since freed tokens get immediately re-consumed by the next request. Fixed short-term by switching to a different Groq model (separate quota pool per model, not account-wide) and long-term by making the extraction script checkpoint-resumable so daily quota resets don't require reprocessing.
 
 ---
 
-## Ready for Phase 3
+## Ready for Phase 4
 
-Phases 0–2 are complete: infrastructure is provisioned, the baseline vector RAG pipeline works end-to-end, and hybrid search + reranking has been validated to improve precision on exact-term queries over pure vector search. Two known parsing-heuristic limitations (Microsoft section mis-titling, Intel restructuring miss) are documented as motivating cases for Phase 3.
+Phases 0–3 are complete: infrastructure is provisioned, baseline vector RAG works end-to-end, hybrid search + reranking improved precision on exact-term queries, and a Neo4j knowledge graph (5 Company, 20 Filing, 2,272 Section, 16,608 Disclosure nodes) now supports multi-hop relational queries independent of fragile PDF title-detection heuristics. Both original Phase 2 motivator cases (Microsoft section mis-titling, Intel restructuring miss) are confirmed resolved via the graph.
 
-**Next up:** entity/relationship extraction into Neo4j (Company, Filing, Note, RiskFactor nodes; FILED_IN, DISCLOSES, RISK_OF edges) and Cypher-based multi-hop querying — designed to resolve retrieval precision issues that depend on unreliable PDF title heuristics by using explicit graph relationships instead.
+One known limitation — `Disclosure` node deduplication (~1.27 relationship-to-node ratio, likely due to inconsistent LLM phrasing across extraction calls) — is documented but intentionally not fixed yet, pending confirmation that it actually degrades Phase 4 agent reasoning quality. A planned embedding-based post-hoc merge is the fix-in-waiting if needed.
+
+**Next up (Phase 4, in progress):** an agentic router built with LangGraph that classifies each question as needing graph retrieval, hybrid search, or both; generates and validates Cypher for graph queries; fans out to the appropriate retrieval path(s); self-corrects on empty/low-confidence results; and generates a final citation-grounded answer — reusing `app/retrieval/hybrid_search.py` and `app/services/llm_client.py` from earlier phases, with a bounded retry count to avoid burning through Groq's daily quota on unbounded self-correction loops.
