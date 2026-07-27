@@ -4,6 +4,7 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
   database_url: str
   groq_api_key: str
+  openrouter_api_key: str
   embedding_model: str = "BAAI/bge-small-en-v1.5"
   embedding_dim: int = 384
   docs_dir: str = "data/raw/sec-10-q/docs"

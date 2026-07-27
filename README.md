@@ -14,7 +14,7 @@ DeepFile combines an LLM agent (LangGraph) that plans/routes/self-corrects retri
 - **Knowledge graph:** Neo4j AuraDB (free tier) — built, Phase 3
 - **Agent orchestration:** LangGraph — built, Phase 4
 - **LLM:** Groq (Llama 3.3 70B / Llama 3.1 8B, with fallback models for quota exhaustion)
-- **Evaluation:** RAGAS — planned, Phase 5
+- **Evaluation:** RAGAS — built, Phase 5
 - **Observability:** Langfuse — planned, Phase 6
 - **API layer:** FastAPI
 - **Package manager:** uv
@@ -28,7 +28,7 @@ DeepFile combines an LLM agent (LangGraph) that plans/routes/self-corrects retri
 | 2 | Hybrid search + reranking (BM25 + RRF + cross-encoder) | Complete |
 | 3 | Knowledge graph layer (entity/relationship extraction into Neo4j) | Complete |
 | 4 | Agentic router with self-correction loop (LangGraph) | Complete |
-| 5 | Evaluation harness (RAGAS benchmark) | Not started |
+| 5 | Evaluation harness (RAGAS benchmark) | Complete |
 | 6 | Observability + guardrails (Langfuse) | Not started |
 | 7 | Incremental indexing (stretch) | Not started |
 
@@ -85,7 +85,7 @@ deepfile/
 ├── data/
 │ ├── raw/sec-10-q/docs/ # 20 docugami PDF filings
 │ ├── processed/ # (future) cleaned/chunked text
-│ └── eval/ # sample_queries.csv, sample_queries_hard.csv, qna_data.csv
+│ └── eval/ # sample_queries.csv, sample_queries_hard.csv, qna_data.csv, ragas_scores_raw.csv
 ├── app/
 │ ├── main.py # FastAPI entry point — wired to the Phase 4 agent
 │ ├── config.py # Settings (pydantic-settings)
@@ -113,7 +113,9 @@ deepfile/
 │ │ ├── retrieve.py # retrieve node — dispatches to graph_node / hybrid_node
 │ │ ├── rewrite.py # rewrite_node — LLM-based query reformulation on retry
 │ │ └── generate.py # generate_node — builds context chunks, calls llm_client
-│ ├── eval/ # Phase 5 (not yet implemented)
+│ ├── eval/ # Phase 5 — COMPLETE
+│ │ ├── run_eval.py # Runs all 3 pipelines (baseline/hybrid/agentic) over qna_data.csv -> raw answers+contexts
+│ │ └── score_ragas.py # RAGAS judge scoring (faithfulness, context precision/recall, answer correctness), checkpointed
 │ ├── observability/ # Phase 6 (not yet implemented)
 │ ├── api/ # (folder reserved; routes currently in main.py)
 │ └── services/
@@ -137,7 +139,6 @@ deepfile/
 ```bash
 uv init deepfile --python 3.12
 cd deepfile
-
 uv add "unstructured[pdf]" fastapi uvicorn psycopg2-binary sqlalchemy pgvector \
        sentence-transformers groq python-dotenv pydantic-settings pymupdf neo4j langgraph
 
@@ -556,11 +557,70 @@ curl -X POST http://localhost:8000/query \
   -d '{"question": "Which companies share a risk factor with Intel?"}'
 ```
 
+---
+
+## Phase 5: Evaluation Harness (RAGAS Benchmark) — COMPLETE
+
+**Goal:** Quantitatively measure whether Phase 3's knowledge graph and Phase 4's agentic self-correction loop actually improve end-to-end answer quality versus a plain vector baseline and a hybrid-only pipeline — rather than relying on the qualitative spot-checks used in Phases 1–4.
+
+### What Was Implemented
+
+1. **Eval runner** (`app/eval/run_eval.py`) — loops over all 80 sampled question-answer pairs (drawn from the 195 in `qna_data.csv`) through three separate pipelines — **baseline** (Phase 1 vector-only), **hybrid** (Phase 2 hybrid+rerank), and **agentic** (Phase 4 full LangGraph agent) — capturing each pipeline's generated `answer` and retrieved `contexts` per question into `data/eval/ragas_scores_raw.csv`.
+2. **Retry/fallback wrapper** (`run_fn_with_fallback()`) — retries each pipeline call against fallback Groq models on rate-limit/quota errors, consistent with the fallback-model pattern established in Phase 3, so a single exhausted model doesn't produce empty answers for an entire pipeline's remaining rows.
+3. **RAGAS scoring** (`app/eval/score_ragas.py`) — scores every (question, answer, contexts, ground_truth) row on four RAGAS metrics: **faithfulness**, **context precision**, **context recall**, and **answer correctness**. Uses an LLM-as-judge (Groq) with a configurable `timeout` and `max_workers`, and is **checkpoint-resumable** — any row with a missing/NaN metric is treated as unscored and retried on the next run, so partial failures never require a full re-score from scratch.
+
+### Debugging Journey
+
+- **Judge timeouts disproportionately hit the agentic pipeline:** the first full scoring pass left up to 22/80 agentic rows with NaN metrics (vs. 0–4/80 for baseline/hybrid). Diagnosed by checking whether the NaN rows had empty answers (a real pipeline failure) or non-empty answers (a pure judge-scoring timeout) — confirmed **0 empty answers** out of the 25 NaN rows, with a mean answer length of ~1,092 characters (up to 7,883). This proved the agent was answering successfully; the RAGAS judge call was simply timing out before scoring finished, most likely because agentic's context (combined graph + hybrid results) produces longer judge prompts than the single-source contexts used by baseline/hybrid.
+- **Fix — checkpoint-resume rescoring, not exclusion:** because `score_ragas.py` already treats any NaN-metric row as "not fully scored," simply rerunning it against only the incomplete rows (skipping the 55+ already-scored agentic rows) resolved the gap without needing to drop or impute missing data, which would have biased the agentic average toward its easier-to-judge subset.
+- **Lesson carried over from Phase 3:** the same "verify the actual cause before treating a symptom as ground truth" discipline applied — an early hypothesis that agentic was systematically failing 25%+ of questions was ruled out by inspecting the raw NaN rows directly rather than assuming the missing-data pattern reflected real pipeline quality.
+
+### Final RAGAS Results (n=80 per pipeline, fully scored)
+
+| Pipeline | Faithfulness | Context Precision | Context Recall | Answer Correctness |
+|---|---|---|---|---|
+| Baseline | 0.632 | 0.803 | 0.622 | 0.501 |
+| Hybrid | 0.601 | 0.822 | 0.620 | 0.516 |
+| Agentic | 0.641 | 0.692 | 0.600 | 0.549 |
+
+**Interpretation:**
+
+- **Answer correctness (the primary target metric):** Agentic scores highest (0.549) vs. hybrid (0.516) and baseline (0.501) — confirming the Phase 3 knowledge graph and Phase 4 self-correction loop translate into measurably better final answers, not just architecturally more sophisticated retrieval.
+- **Faithfulness:** Agentic also leads (0.641) — its answers are the least prone to hallucinating beyond what their retrieved context supports, despite that context being noisier (see below).
+- **Context precision:** Agentic trails both other pipelines (0.692 vs. 0.803 baseline, 0.822 hybrid) — its retrieved context contains proportionally more irrelevant material, consistent with agentic runs combining graph results and hybrid results into a single, larger context window rather than a single clean retrieval pass.
+- **Context recall:** Roughly tied across all three pipelines (0.600–0.622) — none of the three retrieval strategies is meaningfully better at surfacing all necessary facts; they differ mainly in retrieval cleanliness (precision) and downstream answer quality (faithfulness/correctness), not coverage.
+- **Net conclusion:** Agentic trades context precision for answer quality — its retrieval is noisier, but its iterative routing/rewrite/generation loop compensates well enough to produce the most accurate and most faithful final answers of the three pipelines, validating the added complexity of Phases 3–4.
+
+### Phase 5 Deliverables
+
+| Component | File |
+|---|---|
+| Multi-pipeline eval runner (baseline/hybrid/agentic) | `app/eval/run_eval.py` |
+| Fallback-model retry wrapper | `app/eval/run_eval.py` (`run_fn_with_fallback()`) |
+| RAGAS scoring harness (checkpoint-resumable) | `app/eval/score_ragas.py` |
+| Raw per-question scores (answers + contexts + metrics) | `data/eval/ragas_scores_raw.csv` |
+| Human-reviewed ground truth Q&A set | `data/eval/qna_data.csv` |
+
+### Running Phase 5
+
+```bash
+uv add ragas
+uv run python -m app.eval.run_eval        # generate answers+contexts for all 3 pipelines
+uv run python -m app.eval.score_ragas     # score via RAGAS judge, checkpoint-resumable
+```
+
+Re-running `score_ragas` after a partial/interrupted run automatically skips already-scored rows and only retries rows with missing metrics:
+
+```bash
+caffeinate uv run python -m app.eval.score_ragas
+```
+
 ### Next Steps
 
-- Investigate Cypher generation non-determinism.
-- Consider surfacing intermediate `graph_results`/`hybrid_results` in the API response for debugging/demo purposes.
-- Add integration tests covering the full `/query` endpoint (not just node-level unit tests).
+- Investigate Cypher generation non-determinism (carried over from Phase 4).
+- Consider a targeted fix for agentic's context precision gap (e.g., trimming/deduplicating combined graph+hybrid context before it reaches the judge/generation prompt) now that it's been quantitatively confirmed rather than just suspected.
+- Add statistical significance testing (e.g., paired test per question across pipelines) to confirm the observed metric gaps are not noise given n=80.
+- Consider surfacing intermediate `graph_results`/`hybrid_results` in the API response for debugging/demo purposes (carried over from Phase 4).
 
 ---
 
@@ -579,13 +639,14 @@ curl -X POST http://localhost:8000/query \
 - **Intel restructuring still missing after ticker fix** — root cause was the extraction script's `WHERE section ILIKE '%risk%'` filter excluding Intel's restructuring-related sections (no "risk" substring in their titles); fixed by redesigning extraction to run over the full corpus regardless of section name (`extract_disclosures.py`), rather than patching the keyword filter incrementally.
 - **Groq `429 rate_limit_exceeded` on tokens-per-day (TPD)** — hit `llama-3.1-8b-instant`'s 500K daily token quota mid-extraction-run; the error's "try again in Xs" message was misleading near the ceiling since freed tokens get immediately re-consumed by the next request. Fixed short-term by switching to a different Groq model (separate quota pool per model, not account-wide) and long-term by making the extraction script checkpoint-resumable so daily quota resets don't require reprocessing.
 - **Re-routing test via `agent.invoke()` gave dead-data results** — seeding a mid-loop state directly into `agent.invoke()` was silently overwritten because the compiled graph's entry point is always `router`; fixed by testing `needs_retry`, `rewrite_node`, and `router_node` as isolated functions in `scripts/test_reroute.py` instead of through the compiled graph.
+- **RAGAS judge timeouts concentrated on the agentic pipeline** — up to 22/80 agentic rows returned NaN metrics after the first scoring pass, initially suspected to be real agentic answer failures; confirmed via answer-length inspection (0 empty answers, mean ~1,092 chars) that these were pure judge-scoring timeouts caused by agentic's longer combined-context judge prompts, not pipeline failures. Fixed by relying on `score_ragas.py`'s existing checkpoint-resume logic to rescore only the NaN rows.
 
 ---
 
-## Ready for Phase 5
+## Ready for Phase 6
 
-Phases 0–4 are complete: infrastructure is provisioned, baseline vector RAG works end-to-end, hybrid search + reranking improved precision on exact-term queries, a Neo4j knowledge graph (5 Company, 20 Filing, 2,272 Section, 16,608 Disclosure nodes) supports multi-hop relational queries, and a LangGraph agent now routes, retrieves, self-corrects, and generates answers end-to-end through `/query`. Both original Phase 2 motivator cases (Microsoft section mis-titling, Intel restructuring miss) remain confirmed resolved via the graph, and the Phase 4 self-correction loop has been validated both end-to-end and via an isolated re-routing unit test.
+Phases 0–5 are complete: infrastructure is provisioned, baseline vector RAG works end-to-end, hybrid search + reranking improved precision on exact-term queries, a Neo4j knowledge graph (5 Company, 20 Filing, 2,272 Section, 16,608 Disclosure nodes) supports multi-hop relational queries, a LangGraph agent routes/retrieves/self-corrects/generates answers end-to-end through `/query`, and a RAGAS evaluation harness has quantitatively confirmed that the agentic pipeline produces the most correct (0.549) and most faithful (0.641) answers of the three pipelines benchmarked, at the cost of lower context precision (0.692) from its combined graph+hybrid retrieval.
 
-One known limitation — `Disclosure` node deduplication (~1.27 relationship-to-node ratio) — remains documented but unfixed; Phase 4 usage did not surface evidence that it degrades agent reasoning quality, so it stays deferred. A second known issue — non-deterministic Cypher generation at `temperature=0` — was newly surfaced in Phase 4 and is flagged for investigation but is non-blocking.
+Both original Phase 2 motivator cases (Microsoft section mis-titling, Intel restructuring miss) remain confirmed resolved via the graph. Two known non-blocking issues remain open: `Disclosure` node deduplication (~1.27 relationship-to-node ratio, deferred since Phase 3) and non-deterministic Cypher generation at `temperature=0` (flagged since Phase 4) — neither has yet been shown to measurably harm the RAGAS scores above, but both remain candidates for follow-up investigation.
 
-**Next up (Phase 5, not started):** build a RAGAS evaluation harness against the 195 human-reviewed question-answer pairs in `qna_data.csv`, benchmarking the full agentic pipeline (router + graph/hybrid retrieval + self-correction + generation) on faithfulness, answer relevance, and context precision/recall — establishing a quantitative measure of whether Phase 3's knowledge graph and Phase 4's agentic loop actually improved end-to-end answer quality versus the Phase 2 hybrid-only baseline.
+**Next up (Phase 6, not started):** add Langfuse observability (tracing, latency/cost dashboards, guardrails) across all three pipelines, using the Phase 5 RAGAS benchmark as the quality baseline to monitor for regressions once the agentic pipeline is exposed to real, unsampled traffic.

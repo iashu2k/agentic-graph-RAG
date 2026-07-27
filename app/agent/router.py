@@ -1,6 +1,7 @@
 import json
 from groq import Groq
 from app.config import settings
+from app.services import llm_client
 
 client = Groq(api_key=settings.groq_api_key)
 
@@ -30,8 +31,11 @@ def classify_route(question: str, prior_route: str | None = None) -> dict:
         f"if it seems more appropriate now."
     )
 
+  # Uses llm_client.get_model() rather than a hardcoded model string, so
+  # app/eval/run_eval.py's fallback rotation (on Groq 429s) actually applies
+  # to routing classification, not just app/agent/generate.py's final answer call.
   resp = client.chat.completions.create(
-      model="llama-3.1-8b-instant",
+      model=llm_client.get_model(),
       messages=[{"role": "user", "content": ROUTER_PROMPT.format(
           question=question, prior_attempt_note=prior_note
       )}],

@@ -1,6 +1,7 @@
 import json
 from groq import Groq
 from app.config import settings
+from app.services import llm_client
 
 client = Groq(api_key=settings.groq_api_key)
 
@@ -27,8 +28,11 @@ Original question: {question}
 
 
 def rewrite_query(question: str, route: str) -> dict:
+  # Uses llm_client.get_model() rather than a hardcoded model string, so
+  # app/eval/run_eval.py's fallback rotation (on Groq 429s) actually applies
+  # to query rewriting, not just app/agent/generate.py's final answer call.
   resp = client.chat.completions.create(
-      model="llama-3.1-8b-instant",
+      model=llm_client.get_model(),
       messages=[{"role": "user", "content": REWRITE_PROMPT.format(
         question=question, route=route)}],
       response_format={"type": "json_object"},

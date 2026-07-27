@@ -2,6 +2,7 @@ import json
 from groq import Groq
 from app.config import settings
 from app.services.graph_db import graph_db
+from app.services import llm_client
 
 client = Groq(api_key=settings.groq_api_key)
 
@@ -37,7 +38,7 @@ ALLOWED_RELS = {"FILED", "HAS_SECTION", "DISCLOSES"}
 
 def generate_cypher(question: str) -> str | None:
   resp = client.chat.completions.create(
-      model="llama-3.3-70b-versatile",
+      model=llm_client.get_model(),
       messages=[
         {"role": "user", "content": CYPHER_PROMPT.format(question=question)}],
       response_format={"type": "json_object"},
