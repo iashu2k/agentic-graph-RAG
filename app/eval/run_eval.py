@@ -1,3 +1,4 @@
+# app/eval/run_eval.py
 """
 app/eval/run_eval.py
 
@@ -26,6 +27,15 @@ get_model() functions - NOT via settings.model, since app/config.py's
 Settings class has no `model` field (the model was previously hardcoded
 directly inside generate_answer()).
 
+Phase 6 addition: every question run through every pipeline is wrapped in a
+Langfuse span (tagged by pipeline + tier), so the offline eval run itself
+shows up in Langfuse alongside future live-traffic traces - this is what
+lets scripts/compare_ragas_vs_live.py (Phase 6 step 6) diff "offline benchmark"
+vs "production" using the same dashboard rather than two disconnected sources.
+Guardrail scores (has_citation / empty_answer / empty_context) are attached
+to each span exactly like they are for live /query traces, so a spot-check on
+eval traces validates the guardrail logic itself before it sees real traffic.
+
 These CSVs are the direct input to app/eval/score_ragas.py.
 """
 import pandas as pd
@@ -33,9 +43,12 @@ import time
 from pathlib import Path
 from app.eval.pipelines import PIPELINES
 from app.services import llm_client
+from app.observability.tracing import langfuse, flag_output
+
 
 EVAL_SET_PATH = "data/eval/eval_set_phase5.csv"
 OUTPUT_DIR = Path("data/eval/results")
+
 
 # Same fallback chain used in Phase 3's extract_disclosures.py - each model
 # draws from a separate Groq TPD quota pool, so rotating unblocks same-day
@@ -45,7 +58,6 @@ FALLBACK_MODELS = [
     "llama-3.1-8b-instant",
     "openai/gpt-oss-120b",
     "openai/gpt-oss-20b",
-
 ]
 
 
@@ -74,6 +86,37 @@ def run_fn_with_fallback(run_fn, question: str, max_model_attempts: int = len(FA
   return {"answer": "", "contexts": [], "retrieved_filing_ids": [], "route": None}
 
 
+def run_traced(pipeline_name: str, run_fn, question: str, tier: str) -> tuple[dict, str]:
+  """Runs one question through one pipeline inside a Langfuse span, tagged
+  for filtering (pipeline, tier, model used), with guardrail scores attached
+  the same way live /query traces get them in main.py."""
+  with langfuse.start_as_current_span(
+      name=f"deepfile-eval-{pipeline_name}",
+      input={"question": question},
+  ) as span:
+    span.update_trace(
+        tags=[pipeline_name, f"tier:{tier}", "offline-eval"],
+        metadata={"pipeline": pipeline_name,
+                  "tier": tier, "source": "phase5_eval_set"},
+    )
+
+    original_model = llm_client.get_model()
+    result = run_fn_with_fallback(run_fn, question)
+    llm_client.set_model(original_model)  # reset for next question
+
+    trace_id = span.trace_id
+
+    span.update(
+        output={"answer": result["answer"], "route": result.get("route")},
+        metadata={"model_used": llm_client.get_model(),
+                  "route": result.get("route")},
+    )
+
+  flag_output(trace_id=trace_id,
+              answer=result["answer"], contexts=result.get("contexts"))
+  return result, trace_id
+
+
 def run_pipeline(pipeline_name: str, run_fn, eval_df: pd.DataFrame) -> None:
   out_path = OUTPUT_DIR / f"{pipeline_name}_results.csv"
   checkpoint_path = OUTPUT_DIR / f"{pipeline_name}_checkpoint.csv"
@@ -92,9 +135,7 @@ def run_pipeline(pipeline_name: str, run_fn, eval_df: pd.DataFrame) -> None:
       continue
 
     print(f"[{pipeline_name}] {i + 1}/{len(eval_df)}: {question[:60]}")
-    original_model = llm_client.get_model()
-    result = run_fn_with_fallback(run_fn, question)
-    llm_client.set_model(original_model)  # reset for next question
+    result, trace_id = run_traced(pipeline_name, run_fn, question, row["tier"])
 
     rows.append({
         "question": question,
@@ -102,6 +143,7 @@ def run_pipeline(pipeline_name: str, run_fn, eval_df: pd.DataFrame) -> None:
         "tier": row["tier"],
         "answer": result["answer"],
         "contexts": result["contexts"],
+        "langfuse_trace_id": trace_id,
     })
 
     pd.DataFrame(rows).to_csv(checkpoint_path, index=False)
@@ -118,6 +160,8 @@ def run_all():
 
   for pipeline_name, run_fn in PIPELINES.items():
     run_pipeline(pipeline_name, run_fn, eval_df)
+
+  langfuse.flush()  # ensure all spans/scores are sent before process exit
 
 
 if __name__ == "__main__":
