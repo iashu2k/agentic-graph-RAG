@@ -5,6 +5,15 @@
 DeepFile combines an LLM agent (LangGraph) that plans/routes/self-corrects retrieval with a knowledge graph (Neo4j) for multi-hop relational reasoning, layered on top of hybrid vector + keyword search (pgvector + Postgres full-text). The domain is SEC 10-Q filings for five major tech companies, where relationships between entities (companies, filings, notes, disclosures) require multi-hop reasoning that plain vector RAG cannot handle.
 
 ---
+## Architecture
+
+<p align="center">
+  <img
+    src="./assets/architecture-diagram.png"
+    alt="DeepFile Agentic GraphRAG architecture showing offline ingestion, graph and hybrid retrieval, LangGraph orchestration, self-correction, RAGAS evaluation, and Langfuse observability"
+    width="1400"
+  />
+</p>
 
 ## Architecture Overview
 
